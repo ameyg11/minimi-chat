@@ -1,0 +1,23 @@
+{
+  "name": "minimi",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green npm:dev:server npm:dev:client",
+    "dev:server": "npm run dev -w minimi-server",
+    "dev:client": "npm run dev -w minimi-client",
+    "test": "npm run test -w minimi-server",
+    "seed": "npm run seed -w minimi-server",
+    "start": "npm run start -w minimi-server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
