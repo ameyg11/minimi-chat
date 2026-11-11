@@ -10,18 +10,18 @@ function env(name) {
 }
 
 export const config = {
-  openaiKey: env('OPENAI_API_KEY'),
+  geminiKey: env('GEMINI_API_KEY'),
   tavilyKey: env('TAVILY_API_KEY'),
   mongoUri: env('MONGODB_URI'),
-  fastModel: env('LLM_FAST_MODEL') || 'gpt-5.4-nano',
-  answerModel: env('LLM_ANSWER_MODEL') || 'gpt-5.4-mini',
+  fastModel: env('LLM_FAST_MODEL') || 'gemini-3.5-flash',
+  answerModel: env('LLM_ANSWER_MODEL') || 'gemini-3.5-flash',
   timezone: env('USER_TIMEZONE') || 'Asia/Kolkata',
   port: Number(env('PORT') || 3001),
 };
 
 export function missingKeys() {
   const missing = [];
-  if (!config.openaiKey) missing.push('OPENAI_API_KEY');
+  if (!config.geminiKey) missing.push('GEMINI_API_KEY');
   if (!config.tavilyKey) missing.push('TAVILY_API_KEY');
   if (!config.mongoUri) missing.push('MONGODB_URI');
   return missing;

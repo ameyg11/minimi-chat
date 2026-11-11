@@ -32,6 +32,37 @@ const WEAK_HOSTS = [
 
 const PRIMARY_PATH = /pricing|plans|docs|documentation|changelog|releases|release-notes/i;
 
+const DISPLAY_NAMES = {
+  hubspot: 'HubSpot',
+  salesforce: 'Salesforce',
+  pipedrive: 'Pipedrive',
+  close: 'Close',
+  copper: 'Copper',
+  zoho: 'Zoho',
+  freshsales: 'Freshsales',
+  attio: 'Attio',
+  folk: 'Folk',
+  neon: 'Neon',
+  supabase: 'Supabase',
+  railway: 'Railway',
+  render: 'Render',
+  heroku: 'Heroku',
+  digitalocean: 'DigitalOcean',
+  'amazon rds': 'Amazon RDS',
+  rds: 'Amazon RDS',
+  aws: 'AWS',
+  azure: 'Azure',
+  'google cloud sql': 'Google Cloud SQL',
+  cloudsql: 'Google Cloud SQL',
+  cockroach: 'CockroachDB',
+  cockroachdb: 'CockroachDB',
+  timescale: 'Timescale',
+  crunchy: 'Crunchy',
+  tembo: 'Tembo',
+  xata: 'Xata',
+  prisma: 'Prisma',
+};
+
 export const KNOWN_DOMAINS = {
   hubspot: 'hubspot.com',
   salesforce: 'salesforce.com',
@@ -94,6 +125,29 @@ export function rankSource(url, vendorDomains = []) {
 
 export function sortByRank(results) {
   return [...results].sort((a, b) => (a.tier - b.tier) || ((b.score || 0) - (a.score || 0)));
+}
+
+export function entitiesInText(text) {
+  const source = String(text || '');
+  const keys = Object.keys(KNOWN_DOMAINS).filter((key) => key.length >= 4).sort((a, b) => b.length - a.length);
+  const hits = [];
+  for (const key of keys) {
+    const pattern = new RegExp(`(?:^|[^a-z0-9])(${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?=$|[^a-z0-9])`, 'ig');
+    let match;
+    while ((match = pattern.exec(source))) {
+      hits.push({ index: match.index, name: DISPLAY_NAMES[key] || key, domain: KNOWN_DOMAINS[key] });
+      if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
+    }
+  }
+  hits.sort((a, b) => a.index - b.index);
+  const seen = new Set();
+  const names = [];
+  for (const hit of hits) {
+    if (seen.has(hit.domain)) continue;
+    seen.add(hit.domain);
+    names.push(hit.name);
+  }
+  return names;
 }
 
 export function vendorDomainsFor(entities = [], evidence = []) {

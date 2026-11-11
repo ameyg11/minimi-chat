@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { completeJson } from '../models/llm.js';
 import { formatWhen } from '../memory/dates.js';
+import { entitiesInText } from '../search/rank.js';
 
 const STEP_TYPES = ['recall', 'reverify', 'delta', 'research', 'chat', 'clarify'];
 const ASPECTS = ['price', 'launch', 'feature', 'other'];
@@ -89,7 +90,7 @@ export async function planTurn({ message, dates, thread, facts }) {
     });
     return normalizePlan(ensureSteps(planned, message, dates));
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'quota') throw err;
     const planned = fallbackPlan(message, dates);
     planned.warning = 'Used the local planner.';
     return planned;
@@ -133,15 +134,11 @@ export function fallbackPlan(message, dates) {
   if (wantsRecall(text)) steps.push(blankStep('recall'));
   if (wantsReverify(text)) steps.push(blankStep('reverify', ['price', 'feature']));
   else if (wantsDelta(text, dates)) steps.push(blankStep('delta', aspectsFromText(text)));
-  if (!steps.length) {
-    steps.push({
-      ...blankStep('research', ['price', 'feature']),
-      queries: [message.slice(0, 180)],
-    });
-  }
+  if (!steps.length) steps.push(researchStep(message));
+  const entities = entitiesInText(message).slice(0, 5);
   return normalizePlan({
-    topic: message.slice(0, 80),
-    entities: [],
+    topic: entities.join(', ') || message.slice(0, 80),
+    entities,
     clarify: '',
     steps,
     factUpdates: [],
@@ -188,8 +185,21 @@ function blankStep(type, aspects = []) {
   return { type, aspects, entities: [], queries: [], useDate: type !== 'chat' && type !== 'research', since: type === 'delta' || type === 'reverify' };
 }
 
+function researchStep(message) {
+  const entities = entitiesInText(message).slice(0, 5);
+  const aspects = aspectsFromText(message.toLowerCase());
+  const word = aspects.includes('price') ? 'pricing' : 'docs';
+  return {
+    ...blankStep('research', aspects),
+    entities,
+    queries: entities.length ? entities.map((entity) => `${entity} official ${word}`) : [message.slice(0, 180)],
+    useDate: false,
+    since: false,
+  };
+}
+
 function fallbackStep(message) {
-  return { ...blankStep('research', ['feature']), queries: [message.slice(0, 180)], useDate: false, since: false };
+  return researchStep(message);
 }
 
 function wantsRecall(text) {

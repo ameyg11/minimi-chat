@@ -81,7 +81,7 @@ export async function composeAnswer({ message, findings, citations, facts, recal
       confidence: result.confidence || 'medium',
     };
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'quota') throw err;
     return { prose: summarizeFindings(findings), confidence: 'medium' };
   }
 }
@@ -99,7 +99,7 @@ export async function composeChat({ message, facts }) {
     });
     return clean(result.prose) || 'Ask me something I can check.';
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'quota') throw err;
     return 'Ask me something I can check.';
   }
 }

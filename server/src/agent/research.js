@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import { completeJson } from '../models/llm.js';
 import { searchWeb, extractPages } from '../search/tavily.js';
-import { domainOf, rankSource, sortByRank, vendorDomainsFor } from '../search/rank.js';
+import { domainOf, entitiesInText, rankSource, sortByRank, vendorDomainsFor } from '../search/rank.js';
 import { hashText, unchangedByHash, diffClaims, findingsFromUnchanged } from './diff.js';
 import { verifyClaims } from './verify.js';
 import { saveEvidence } from '../memory/store.js';
@@ -62,9 +62,43 @@ export function buildQueries(plan, memory) {
   const queries = [];
   for (const step of plan.steps) {
     if (step.type === 'research') {
-      const list = (step.queries.length ? step.queries : [plan.topic]).filter(Boolean).slice(0, 3);
-      for (const query of list) {
-        queries.push({ query, includeDomains: [], vendorDomains: [], entity: '', kind: 'research' });
+      const names = [...new Set([
+        ...step.entities,
+        ...planEntities(plan),
+        ...entitiesInText(step.queries.join(' ')),
+        ...entitiesInText(plan.topic || ''),
+      ])].filter(Boolean).slice(0, 5);
+      const aspects = step.aspects.length ? step.aspects : planAspects(plan);
+      if (names.length && (aspects.includes('price') || aspects.includes('launch'))) {
+        const word = aspects.includes('price') ? 'pricing' : 'changelog';
+        for (const entity of names) {
+          const domains = vendorDomainsFor([entity], memory.evidence);
+          queries.push({
+            query: `${entity} official ${word}`,
+            includeDomains: domains.slice(0, 1),
+            vendorDomains: domains,
+            entity,
+            kind: 'research',
+          });
+        }
+      } else if (names.length) {
+        const list = (step.queries.length ? step.queries : names.map((entity) => `${entity} official docs`)).slice(0, 3);
+        for (const query of list) {
+          const entity = names.find((name) => query.toLowerCase().includes(name.toLowerCase())) || names[0];
+          const domains = vendorDomainsFor([entity], memory.evidence);
+          queries.push({
+            query,
+            includeDomains: domains.slice(0, 1),
+            vendorDomains: domains,
+            entity,
+            kind: 'research',
+          });
+        }
+      } else {
+        const list = (step.queries.length ? step.queries : [plan.topic]).filter(Boolean).slice(0, 3);
+        for (const query of list) {
+          queries.push({ query, includeDomains: [], vendorDomains: [], entity: '', kind: 'research' });
+        }
       }
     }
     if (step.type === 'delta' || step.type === 'reverify') {
@@ -138,7 +172,7 @@ export async function recheck({ memory, plan, pushTrace }) {
   try {
     extracted = await extractPages(urls);
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'quota') throw err;
     pushTrace('refetch', 'The re-read failed.');
     return { findings, evidenceDocs, persistClaims, fetchFailed: true };
   }
@@ -209,8 +243,9 @@ export async function researchNew({ plan, memory, pushTrace }) {
     if (covered(entities, aspects, claims)) break;
     const searched = await runSearches([query], searchesLeft, pushTrace);
     searchesLeft -= searched.used;
+    const vendorHits = searched.hits.filter((hit) => hit.tier <= 2);
     const read = await readHits({
-      hits: searched.hits.slice(0, 2),
+      hits: (vendorHits.length ? vendorHits : searched.hits).slice(0, 1),
       entities,
       aspects,
       extractCap: Math.max(0, budget.extracts - evidenceDocs.length),
@@ -299,7 +334,7 @@ async function runSearches(queries, cap, pushTrace) {
       results = await searchWeb({ query: query.query, includeDomains: query.includeDomains, maxResults: 5 });
       used += 1;
     } catch (err) {
-      if (err.code === 'auth') throw err;
+      if (err.code === 'auth' || err.code === 'quota') throw err;
       pushTrace('search', 'A search failed.');
       continue;
     }
@@ -309,7 +344,7 @@ async function runSearches(queries, cap, pushTrace) {
         results = await searchWeb({ query: query.query, maxResults: 5 });
         used += 1;
       } catch (err) {
-        if (err.code === 'auth') throw err;
+        if (err.code === 'auth' || err.code === 'quota') throw err;
       }
     }
     for (const result of results) {
@@ -333,7 +368,7 @@ async function readHits({ hits, entities, aspects, extractCap, pushTrace }) {
     try {
       extracted = await extractPages([hit.url]);
     } catch (err) {
-      if (err.code === 'auth') throw err;
+      if (err.code === 'auth' || err.code === 'quota') throw err;
       pushTrace('extract', `Could not read ${hit.domain || 'a page'}.`);
       continue;
     }
@@ -399,7 +434,7 @@ async function extractClaims({ page, entities, aspects }) {
       observedAt: page.fetchedAt || new Date(),
     })).filter((claim) => claim.entity && claim.quote);
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'quota') throw err;
     return [];
   }
 }
