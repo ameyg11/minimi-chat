@@ -145,6 +145,33 @@ export function fallbackPlan(message, dates) {
   });
 }
 
+const VAGUE_ENTITY = /^(crm|crm tools|tools|tool|products|product|software|them|those|these|it|they)$/i;
+
+export function attachThreadEntities(plan, messages, question) {
+  const remembered = [];
+  for (const item of messages || []) {
+    remembered.push(...(item.entities || []));
+    remembered.push(...entitiesInText(item.content || ''));
+  }
+  const named = [...(plan.entities || []), ...plan.steps.flatMap((step) => step.entities || [])]
+    .map((entity) => String(entity || '').trim())
+    .filter((entity) => entity.length > 1 && !VAGUE_ENTITY.test(entity));
+  const entities = [...new Set(named.length ? named : [...entitiesInText(question), ...remembered])]
+    .map((entity) => String(entity || '').trim())
+    .filter((entity) => entity.length > 1 && !VAGUE_ENTITY.test(entity))
+    .slice(0, 5);
+  if (!entities.length) return plan;
+  return {
+    ...plan,
+    entities,
+    steps: plan.steps.map((step) => {
+      if (!['delta', 'reverify', 'research'].includes(step.type)) return step;
+      const own = (step.entities || []).map((entity) => String(entity).trim()).filter((entity) => entity && !VAGUE_ENTITY.test(entity));
+      return { ...step, entities: own.length ? own : entities };
+    }),
+  };
+}
+
 export function planEntities(plan) {
   return [...new Set([
     ...(plan.entities || []),

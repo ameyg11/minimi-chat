@@ -13,7 +13,7 @@ import {
   presentMessage,
   titleFrom,
 } from '../memory/store.js';
-import { planTurn } from './plan.js';
+import { attachThreadEntities, planAspects, planEntities, planTurn } from './plan.js';
 import { recheck, researchNew } from './research.js';
 import { collapseFindings } from './diff.js';
 import {
@@ -68,17 +68,18 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
     listFacts(),
     recentMessages(conversation._id, 8),
   ]);
-  const plan = await planTurn({ message, dates, thread, facts });
+  let plan = await planTurn({ message, dates, thread, facts });
   if (plan.warning) pushTrace('plan', plan.warning);
   pushTrace('plan', describePlan(plan));
 
   const types = new Set(plan.steps.map((step) => step.type));
-  const memory = await retrieveMemory({
+  let memory = await retrieveMemory({
     plan,
     dates,
     conversationId: conversation._id,
     timeZone: config.timezone,
   });
+  plan = attachThreadEntities(plan, [...thread, ...memory.messages], message);
 
   if (memory.ambiguous) {
     return finish({
@@ -120,11 +121,29 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
   let fetchFailed = false;
   const checking = types.has('reverify') || types.has('delta');
 
+  let noEarlierSnapshot = false;
   if (checking && memory.found) {
-    const checked = await recheck({ memory, plan, pushTrace });
-    findings = findings.concat(checked.findings);
-    evidenceDocs = evidenceDocs.concat(checked.evidenceDocs);
-    fetchFailed = checked.fetchFailed;
+    const hasBaseline = memory.claims.length > 0 || memory.evidence.some((item) => item.url);
+    if (hasBaseline) {
+      const checked = await recheck({ memory, plan, pushTrace });
+      findings = findings.concat(checked.findings);
+      evidenceDocs = evidenceDocs.concat(checked.evidenceDocs);
+      fetchFailed = checked.fetchFailed;
+    } else if (planEntities(plan).length) {
+      noEarlierSnapshot = true;
+      pushTrace('search', `No saved page for ${planEntities(plan).join(', ')}. Checking the current pages.`);
+      const fresh = await researchNew({ plan: currentPagesPlan(plan), memory, pushTrace });
+      findings = findings.concat(fresh.findings.map((finding) => ({
+        ...finding,
+        note: [finding.note, 'No earlier snapshot, so this is not a change.'].filter(Boolean).join(' '),
+      })));
+      evidenceDocs = evidenceDocs.concat(fresh.evidenceDocs);
+    } else {
+      const checked = await recheck({ memory, plan, pushTrace });
+      findings = findings.concat(checked.findings);
+      evidenceDocs = evidenceDocs.concat(checked.evidenceDocs);
+      fetchFailed = checked.fetchFailed;
+    }
   }
 
   if (researching) {
@@ -150,6 +169,9 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
   } else if (fetchFailed && !findings.some((item) => ['changed', 'unchanged', 'sourced', 'not_big'].includes(item.status))) {
     abstainReason = FETCH_FAIL;
     prose = [recall, FETCH_FAIL].filter(Boolean).join('\n\n');
+  } else if (checking && noEarlierSnapshot && !findings.length) {
+    abstainReason = `I don't have an earlier source for ${planEntities(plan).join(', ')}, and I couldn't read a current page, so I can't say whether anything changed.`;
+    prose = abstainReason;
   } else if (researching && !findings.length && !recall) {
     abstainReason = 'I couldn\'t find a primary source for that, so I don\'t have an answer.';
     prose = abstainReason;
@@ -161,6 +183,9 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
       facts,
       recall,
       timeZone: config.timezone,
+      products: planEntities(plan),
+      noEarlierSnapshot,
+      earlierQuestions: memory.messages.filter((item) => item.role === 'user').slice(-3).map((item) => item.content),
     });
     const body = composed.prose || summarizeFindings(findings);
     prose = [recall, body].filter(Boolean).join('\n\n');
@@ -297,6 +322,21 @@ async function emitProse(prose, onToken) {
     }
   }
   if (buffer) onToken(buffer);
+}
+
+function currentPagesPlan(plan) {
+  const aspects = [...new Set([...planAspects(plan), 'price', 'launch'])];
+  return {
+    ...plan,
+    steps: [{
+      type: 'research',
+      aspects,
+      entities: planEntities(plan),
+      queries: [],
+      useDate: false,
+      since: false,
+    }],
+  };
 }
 
 function describePlan(plan) {

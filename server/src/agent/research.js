@@ -46,7 +46,8 @@ export function budgetFor(steps) {
   const research = types.has('research');
   const delta = types.has('delta');
   const reverify = types.has('reverify');
-  if (research && !delta && !reverify) return { searches: 3, extracts: 4, refetch: false };
+  const priceAndLaunch = steps.some((step) => step.type === 'research' && (step.aspects || []).includes('price') && (step.aspects || []).includes('launch'));
+  if (research && !delta && !reverify) return { searches: priceAndLaunch ? 6 : 3, extracts: priceAndLaunch ? 6 : 4, refetch: false };
   if (reverify && !delta && !research) return { searches: 2, extracts: 6, refetch: true };
   if (delta && !research) return { searches: 5, extracts: 8, refetch: true };
   return { searches: (research ? 3 : 0) + (delta || reverify ? 2 : 0), extracts: 8, refetch: delta || reverify };
@@ -70,16 +71,20 @@ export function buildQueries(plan, memory) {
       ])].filter(Boolean).slice(0, 5);
       const aspects = step.aspects.length ? step.aspects : planAspects(plan);
       if (names.length && (aspects.includes('price') || aspects.includes('launch'))) {
-        const word = aspects.includes('price') ? 'pricing' : 'changelog';
+        const words = [];
+        if (aspects.includes('price')) words.push('pricing');
+        if (aspects.includes('launch')) words.push('changelog');
         for (const entity of names) {
           const domains = vendorDomainsFor([entity], memory.evidence);
-          queries.push({
-            query: `${entity} official ${word}`,
-            includeDomains: domains.slice(0, 1),
-            vendorDomains: domains,
-            entity,
-            kind: 'research',
-          });
+          for (const word of words) {
+            queries.push({
+              query: `${entity} official ${word}`,
+              includeDomains: domains.slice(0, 1),
+              vendorDomains: domains,
+              entity,
+              kind: 'research',
+            });
+          }
         }
       } else if (names.length) {
         const list = (step.queries.length ? step.queries : names.map((entity) => `${entity} official docs`)).slice(0, 3);
@@ -152,7 +157,7 @@ export async function recheck({ memory, plan, pushTrace }) {
         aspect: 'other',
         qualifier: '',
         status: 'unverifiable',
-        before: lastAssistant(memory)?.slice(0, 180) || null,
+        before: null,
         after: null,
         beforeAt: null,
         afterAt: null,
