@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Comparison } from './Comparison.jsx';
 import { Findings } from './Findings.jsx';
 import { Citations } from './Citations.jsx';
 import { Trace } from './Trace.jsx';
@@ -23,10 +24,17 @@ export function Message({ message }) {
   return (
     <article className="message message-assistant">
       <Prose text={message.content} onCite={setOpenCite} />
+      <Comparison rows={message.comparison || []} />
       <Findings findings={message.findings || []} />
       <Citations citations={message.citations || []} open={openCite} onOpen={setOpenCite} />
       <Trace trace={message.trace || []} />
-      {CONFIDENCE[message.confidence] ? <p className={`confidence confidence-${message.confidence}`}>{CONFIDENCE[message.confidence]}</p> : null}
+      {CONFIDENCE[message.confidence] ? (
+        <p className={`confidence confidence-${message.confidence}`}>
+          {message.confidence === 'abstain' && message.missingNote
+            ? `Not enough to say: ${message.missingNote}`
+            : CONFIDENCE[message.confidence]}
+        </p>
+      ) : null}
     </article>
   );
 }

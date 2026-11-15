@@ -14,6 +14,7 @@ import {
   titleFrom,
 } from '../memory/store.js';
 import { attachThreadEntities, planAspects, planEntities, planTurn } from './plan.js';
+import { comparisonRows, gapFinding, missingPrimary, teamSize, withTeamTotals } from './report.js';
 import { recheck, researchNew } from './research.js';
 import { collapseFindings } from './diff.js';
 import {
@@ -79,7 +80,7 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
     conversationId: conversation._id,
     timeZone: config.timezone,
   });
-  plan = attachThreadEntities(plan, [...thread, ...memory.messages], message);
+  plan = attachThreadEntities(plan, [...thread, ...memory.messages], message, memory.claims || []);
 
   if (memory.ambiguous) {
     return finish({
@@ -153,6 +154,12 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
   }
 
   findings = collapseFindings(findings);
+  const size = teamSize(facts, [message, ...memory.messages.map((item) => item.content)]);
+  findings = withTeamTotals(findings, size);
+  const gaps = missingPrimary(planEntities(plan), planAspects(plan), findings);
+  findings = findings.concat(gaps.map(gapFinding));
+  const comparison = comparisonRows(findings);
+  const missingNote = gaps.map((gap) => `${gap.entity} ${gap.aspect}`).join(', ');
   const recall = types.has('recall') ? recallProse(memory.messages, config.timezone, dates.ranges[0]?.label) : '';
   const citations = buildCitations(findings, [...memory.evidence, ...evidenceDocs]);
   const numbered = numberFindings(findings, citations);
@@ -172,9 +179,14 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
   } else if (checking && noEarlierSnapshot && !findings.length) {
     abstainReason = `I don't have an earlier source for ${planEntities(plan).join(', ')}, and I couldn't read a current page, so I can't say whether anything changed.`;
     prose = abstainReason;
-  } else if (researching && !findings.length && !recall) {
-    abstainReason = 'I couldn\'t find a primary source for that, so I don\'t have an answer.';
+  } else if (researching && !findings.some((item) => ['changed', 'unchanged', 'sourced', 'not_big'].includes(item.status)) && !recall) {
+    abstainReason = missingNote
+      ? `Not enough to say: ${missingNote}.`
+      : 'I couldn\'t find a primary source for that, so I don\'t have an answer.';
     prose = abstainReason;
+  } else if (!findings.some((item) => ['changed', 'unchanged', 'sourced', 'not_big'].includes(item.status)) && missingNote) {
+    abstainReason = `Not enough to say: ${missingNote}.`;
+    prose = [recall, abstainReason].filter(Boolean).join('\n\n');
   } else if (findings.length || recall) {
     const composed = await composeAnswer({
       message,
@@ -214,6 +226,8 @@ async function execute({ conversation, message, startedAt, onStatus, onToken }) 
     trace,
     onToken,
     persist: findings.map((item) => item.persist).filter(Boolean),
+    comparison,
+    missingNote,
   });
 }
 
@@ -230,6 +244,8 @@ async function finish({
   trace,
   onToken,
   persist = [],
+  comparison = [],
+  missingNote = '',
 }) {
   const user = await saveMessage({
     conversationId: conversation._id,
@@ -251,6 +267,8 @@ async function finish({
     confidence,
     abstainReason: abstainReason || '',
     trace,
+    comparison,
+    missingNote,
   });
   if (persist.length) {
     await saveClaims(persist.map((claim) => ({

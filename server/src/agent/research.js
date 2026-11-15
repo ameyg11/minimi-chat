@@ -1,10 +1,10 @@
 import { config } from '../config.js';
 import { completeJson } from '../models/llm.js';
 import { searchWeb, extractPages } from '../search/tavily.js';
-import { domainOf, entitiesInText, rankSource, sortByRank, vendorDomainsFor } from '../search/rank.js';
+import { domainOf, entitiesInText, pricingUrlFor, rankSource, sortByRank, vendorDomainsFor } from '../search/rank.js';
 import { hashText, unchangedByHash, diffClaims, findingsFromUnchanged } from './diff.js';
 import { verifyClaims } from './verify.js';
-import { saveEvidence } from '../memory/store.js';
+import { saveEvidence, stampEvidence } from '../memory/store.js';
 import { planEntities, planAspects } from './plan.js';
 
 const ASPECTS = ['price', 'launch', 'feature', 'other'];
@@ -242,6 +242,26 @@ export async function researchNew({ plan, memory, pushTrace }) {
   const tagged = queries.map((query) => ({ ...query, vendorDomains: vendorDomains.length ? vendorDomains : query.vendorDomains }));
   const evidenceDocs = [];
   const claims = [];
+  if (aspects.includes('price') && entities.length) {
+    const directHits = entities.map((entity) => {
+      const url = pricingUrlFor(entity);
+      if (!url) return null;
+      const domains = vendorDomainsFor([entity], memory.evidence);
+      return { url, title: `${entity} pricing`, entity, ...rankSource(url, domains) };
+    }).filter(Boolean);
+    if (directHits.length) {
+      pushTrace('extract', `Opening pricing pages for ${entities.join(', ')}.`);
+      const read = await readHits({
+        hits: directHits,
+        entities,
+        aspects,
+        extractCap: Math.min(directHits.length, budget.extracts),
+        pushTrace,
+      });
+      evidenceDocs.push(...read.evidenceDocs);
+      claims.push(...read.claims);
+    }
+  }
   let searchesLeft = budget.searches;
   for (const query of tagged) {
     if (searchesLeft <= 0) break;
@@ -273,6 +293,8 @@ export async function researchNew({ plan, memory, pushTrace }) {
     quote: claim.quote || '',
     tier: claim.tier,
     url: claim.url,
+    period: claim.period,
+    unit: claim.unit,
     persist: claim,
   }));
   return { findings, evidenceDocs, persistClaims: claims, fetchFailed: false };
@@ -377,6 +399,7 @@ async function readHits({ hits, entities, aspects, extractCap, pushTrace }) {
       pushTrace('extract', `Could not read ${hit.domain || 'a page'}.`);
       continue;
     }
+    if (extracted.retried) pushTrace('extract', `Reading ${hit.domain || 'the page'} again.`);
     const page = extracted.pages[0];
     if (!page) continue;
     const saved = await saveEvidence({
@@ -398,6 +421,13 @@ async function readHits({ hits, entities, aspects, extractCap, pushTrace }) {
     });
     const { kept, dropped } = verifyClaims(extractedClaims, new Map([[String(saved._id), saved]]));
     if (dropped.length) pushTrace('verify', `Dropped ${dropped.length} unsourced claim${dropped.length === 1 ? '' : 's'}.`);
+    const stamped = new Set();
+    for (const claim of kept) {
+      await stampEvidence(saved._id, claim.quote);
+      if (stamped.has(claim.entity)) continue;
+      stamped.add(claim.entity);
+      pushTrace('baseline', `Saved a baseline for ${claim.entity}.`);
+    }
     evidenceDocs.push(saved);
     claims.push(...kept);
   }

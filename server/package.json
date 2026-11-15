@@ -6,7 +6,8 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "test": "node --test",
-    "seed": "node src/scripts/seed-demo.js"
+    "seed": "node src/scripts/seed-demo.js",
+    "check": "node src/scripts/frozen-check.js"
   },
   "dependencies": {
     "chrono-node": "^2.8.3",

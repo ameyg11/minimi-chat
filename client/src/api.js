@@ -10,6 +10,12 @@ export async function getConversation(id) {
   return res.json();
 }
 
+export async function getTimeline() {
+  const res = await fetch('/api/timeline');
+  if (!res.ok) throw new Error('Could not load the timeline.');
+  return res.json();
+}
+
 export async function getFacts() {
   const res = await fetch('/api/facts');
   if (!res.ok) throw new Error('Could not load what I know.');

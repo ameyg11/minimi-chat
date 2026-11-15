@@ -18,6 +18,8 @@ const messageSchema = new mongoose.Schema({
   confidence: { type: String, default: '' },
   abstainReason: { type: String, default: '' },
   trace: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  comparison: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  missingNote: { type: String, default: '' },
 });
 
 messageSchema.index({ entities: 1, createdAt: -1 });

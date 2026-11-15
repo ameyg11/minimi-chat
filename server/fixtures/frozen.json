@@ -1,0 +1,51 @@
+{
+  "now": "2026-11-11T09:30:00.000Z",
+  "questions": {
+    "recall": "What did I ask you on 3 November?",
+    "reverify": "Is your answer still correct?",
+    "delta": "Has the price changed since 3 November?"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "What does Neon charge for Launch compute?",
+      "createdAt": "2026-11-03T05:00:00.000Z"
+    }
+  ],
+  "pageBefore": "Neon Launch compute is listed at $0.106 per CU-hour.",
+  "pageSame": "Neon Launch compute is listed at $0.106 per CU-hour.",
+  "claim": {
+    "entity": "Neon",
+    "aspect": "price",
+    "qualifier": "Launch compute",
+    "display": "$0.106 per CU-hour",
+    "value": "0.106",
+    "unit": "CU-hour",
+    "period": "hour",
+    "quote": "Neon Launch compute is listed at $0.106 per CU-hour.",
+    "observedAt": "2026-11-03T05:00:00.000Z",
+    "evidenceId": "before"
+  },
+  "claimAfter": {
+    "entity": "Neon",
+    "aspect": "price",
+    "qualifier": "Launch compute",
+    "display": "$0.140 per CU-hour",
+    "value": "0.140",
+    "unit": "CU-hour",
+    "period": "hour",
+    "quote": "Neon Launch compute is listed at $0.140 per CU-hour.",
+    "observedAt": "2026-11-11T09:30:00.000Z",
+    "evidenceId": "after"
+  },
+  "badClaim": {
+    "entity": "Neon",
+    "aspect": "price",
+    "qualifier": "Launch compute",
+    "display": "$5 per CU-hour",
+    "value": "5",
+    "period": "hour",
+    "quote": "Launch compute is $5 per CU-hour.",
+    "evidenceId": "e"
+  }
+}

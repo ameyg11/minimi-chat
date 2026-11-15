@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getConversations, getConversation, getFacts, streamChat } from './api.js';
+import { getConversations, getConversation, getFacts, getTimeline, streamChat } from './api.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { Chat } from './components/Chat.jsx';
 import { Composer } from './components/Composer.jsx';
@@ -7,6 +7,7 @@ import { Composer } from './components/Composer.jsx';
 export function App() {
   const [conversations, setConversations] = useState([]);
   const [facts, setFacts] = useState([]);
+  const [timeline, setTimeline] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -23,9 +24,10 @@ export function App() {
   }, []);
 
   async function refreshLists() {
-    const [conversationBody, factBody] = await Promise.all([getConversations(), getFacts()]);
+    const [conversationBody, factBody, timelineBody] = await Promise.all([getConversations(), getFacts(), getTimeline()]);
     setConversations(conversationBody.conversations);
     setFacts(factBody.facts);
+    setTimeline(timelineBody.timeline || []);
     return conversationBody.conversations;
   }
 
@@ -104,6 +106,7 @@ export function App() {
       <Sidebar
         conversations={conversations}
         facts={facts}
+        timeline={timeline}
         activeId={activeId}
         open={sidebarOpen}
         onOpen={openConversation}

@@ -1,4 +1,4 @@
-export function Sidebar({ conversations, facts, activeId, open, onOpen, onNew, onClose }) {
+export function Sidebar({ conversations, facts, timeline = [], activeId, open, onOpen, onNew, onClose }) {
   return (
     <aside className={open ? 'sidebar open' : 'sidebar'}>
       <div className="brand">
@@ -24,6 +24,22 @@ export function Sidebar({ conversations, facts, activeId, open, onOpen, onNew, o
         ))}
         {!conversations.length ? <p className="empty-note">No conversations yet.</p> : null}
       </nav>
+      <section className="timeline" aria-label="Timeline">
+        <h2>Timeline</h2>
+        {timeline.length ? timeline.map((item) => (
+          <div key={item.entity}>
+            <p className="timeline-entity">{item.entity}</p>
+            {item.events.map((event, index) => (
+              <p key={`${item.entity}-${index}`} className="timeline-event">
+                <time>{formatShort(event.at)}</time>
+                {' '}
+                {event.sameHash ? 'Same page. ' : ''}
+                {event.display || event.aspect}
+              </p>
+            ))}
+          </div>
+        )) : <p className="empty-note">No pages saved yet.</p>}
+      </section>
       <section className="facts" aria-label="What I know">
         <h2>What I know</h2>
         {facts.length ? facts.map((fact) => (

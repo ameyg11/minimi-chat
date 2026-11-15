@@ -64,6 +64,22 @@ test('a matching hash becomes unchanged without comparing prose', () => {
   assert.equal(findings[0].persist.evidenceId, 'e2');
 });
 
+test('prices without a plan name are not compared', () => {
+  const findings = diffClaims(
+    [{ entity: 'HubSpot', aspect: 'price', qualifier: '', display: '$15 per seat/month', observedAt: '2026-11-03', evidenceId: 'old' }],
+    [{ entity: 'HubSpot', aspect: 'price', qualifier: '', display: '$20 per seat/month', observedAt: '2026-11-11', evidenceId: 'new' }],
+  );
+  assert.equal(findings[0].status, 'not_comparable');
+});
+
+test('a seat price is not compared with a price that does not say per seat', () => {
+  const findings = diffClaims(
+    [{ entity: 'HubSpot', aspect: 'price', qualifier: 'starter', display: '$15 per seat/month', observedAt: '2026-11-03', evidenceId: 'old' }],
+    [{ entity: 'HubSpot', aspect: 'price', qualifier: 'starter', display: '$15 per month', observedAt: '2026-11-11', evidenceId: 'new' }],
+  );
+  assert.equal(findings[0].status, 'not_comparable');
+});
+
 test('a minor release is not a big ship, a major launch is', () => {
   const minor = diffClaims(
     [],

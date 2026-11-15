@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { entitiesInText, rankSource } from '../src/search/rank.js';
+import { entitiesInText, pricingUrlFor, rankSource } from '../src/search/rank.js';
 
 const vendors = ['hubspot.com'];
 
@@ -18,6 +18,12 @@ test('a sentence names HubSpot, Pipedrive, and Attio in the order they appear', 
     entitiesInText('For a 20-person sales team, what do HubSpot, Pipedrive, and Attio charge per seat right now?'),
     ['HubSpot', 'Pipedrive', 'Attio'],
   );
+});
+
+test('known vendors open their pricing page directly', () => {
+  assert.equal(pricingUrlFor('HubSpot'), 'https://www.hubspot.com/pricing/sales');
+  assert.equal(pricingUrlFor('Pipedrive'), 'https://www.pipedrive.com/en/pricing');
+  assert.equal(pricingUrlFor('Attio'), 'https://attio.com/pricing');
 });
 
 test('a pricing path on a random site is not treated as the vendor', () => {

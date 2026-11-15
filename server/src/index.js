@@ -8,6 +8,7 @@ import {
   getConversation,
   messagesFor,
   listFacts,
+  listTimeline,
   presentConversation,
   presentMessage,
   isId,
@@ -46,6 +47,10 @@ app.get('/api/conversations/:id', async (req, res) => {
 
 app.get('/api/facts', async (_req, res) => {
   res.json({ facts: await listFacts() });
+});
+
+app.get('/api/timeline', async (_req, res) => {
+  res.json({ timeline: await listTimeline() });
 });
 
 app.post('/api/chat', async (req, res) => {

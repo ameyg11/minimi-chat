@@ -150,6 +150,21 @@ export function entitiesInText(text) {
   return names;
 }
 
+export const PRICING_URLS = {
+  'hubspot.com': 'https://www.hubspot.com/pricing/sales',
+  'pipedrive.com': 'https://www.pipedrive.com/en/pricing',
+  'attio.com': 'https://attio.com/pricing',
+  'neon.tech': 'https://neon.tech/pricing',
+  'supabase.com': 'https://supabase.com/pricing',
+  'salesforce.com': 'https://www.salesforce.com/editions-pricing/sales-cloud/',
+};
+
+export function pricingUrlFor(entity) {
+  const domain = vendorDomainsFor([entity])[0];
+  if (!domain) return '';
+  return PRICING_URLS[domain] || `https://${domain}/pricing`;
+}
+
 export function vendorDomainsFor(entities = [], evidence = []) {
   const found = [];
   for (const entity of entities) {

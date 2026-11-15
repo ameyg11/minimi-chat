@@ -94,8 +94,35 @@ button { cursor: pointer; }
 .thread time, .message-user time { color: var(--muted); font-size: 12px; }
 .thread.active { background: rgba(255, 255, 255, 0.55); }
 
-.facts { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
-.facts h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.timeline, .facts { padding-top: 12px; border-top: 1px solid var(--line); }
+.facts { margin-top: auto; }
+.timeline { max-height: 30%; overflow: auto; }
+.timeline h2, .facts h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.timeline-entity { margin: 8px 0 2px; font-size: 14px; }
+.timeline-event { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+
+.compare {
+  width: min(720px, 100%);
+  margin: 12px auto 16px;
+  border-collapse: collapse;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+}
+.compare caption {
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.compare th, .compare td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.compare a { color: var(--accent); }
 .facts p { margin: 0 0 8px; font-size: 14px; }
 
 .main {

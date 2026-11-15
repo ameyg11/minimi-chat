@@ -146,13 +146,32 @@ export function fallbackPlan(message, dates) {
 }
 
 const VAGUE_ENTITY = /^(crm|crm tools|tools|tool|products|product|software|them|those|these|it|they)$/i;
+const MEMORY_STOP = new Set('that those these them what have with from then since changed change pricing price prices shipped something their there about still correct today does been were your the and for any has not now just last next week team person people sales'.split(' '));
 
-export function attachThreadEntities(plan, messages, question) {
-  const remembered = [];
+export function rememberedEntities(question, messages, claims = []) {
+  const found = [];
   for (const item of messages || []) {
-    remembered.push(...(item.entities || []));
-    remembered.push(...entitiesInText(item.content || ''));
+    found.push(...(item.entities || []));
+    found.push(...entitiesInText(item.content || ''));
   }
+  const tokens = String(question || '').toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 4 && !MEMORY_STOP.has(token));
+  for (const claim of claims || []) {
+    const blob = `${claim.entity || ''} ${claim.qualifier || ''} ${claim.display || ''}`.toLowerCase();
+    if (tokens.some((token) => blob.includes(token))) found.push(claim.entity);
+  }
+  const anaphora = /\b(that|those|these|them|we looked|earlier|any of them)\b/i.test(question || '');
+  if (anaphora) {
+    const latest = [...(messages || [])].reverse().find((item) => item.role === 'user' && item.content);
+    if (latest) {
+      found.push(...(latest.entities || []));
+      found.push(...entitiesInText(latest.content || ''));
+    }
+  }
+  return [...new Set(found.map((entity) => String(entity || '').trim()).filter((entity) => entity.length > 1 && !VAGUE_ENTITY.test(entity)))];
+}
+
+export function attachThreadEntities(plan, messages, question, claims = []) {
+  const remembered = rememberedEntities(question, messages, claims);
   const named = [...(plan.entities || []), ...plan.steps.flatMap((step) => step.entities || [])]
     .map((entity) => String(entity || '').trim())
     .filter((entity) => entity.length > 1 && !VAGUE_ENTITY.test(entity));

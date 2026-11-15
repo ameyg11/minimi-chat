@@ -212,7 +212,15 @@ export function collapseFindings(findings) {
 
 function comparePair(prev, next) {
   if (prev.aspect === 'price') {
-    const compared = comparablePrice(parseMoney(prev), parseMoney(next));
+    if (!qualifierKey(prev.qualifier) || !qualifierKey(next.qualifier)) {
+      return findingFrom(prev, next, 'not_comparable', 'Both prices need a plan name before I can compare them.');
+    }
+    const left = parseMoney(prev);
+    const right = parseMoney(next);
+    if (left && right && (left.basis === 'seat') !== (right.basis === 'seat')) {
+      return findingFrom(prev, next, 'not_comparable', 'Both prices need to say per seat before I can compare them.');
+    }
+    const compared = comparablePrice(left, right);
     if (!compared.ok) {
       return findingFrom(prev, next, 'not_comparable', 'The two prices are not in the same terms.');
     }

@@ -78,6 +78,41 @@ export async function saveEvidence(doc) {
   return saved.toObject();
 }
 
+export async function stampEvidence(id, quote) {
+  if (!id || !quote) return;
+  await Evidence.updateOne({ _id: id }, { $set: { quote: String(quote).slice(0, 500) } });
+}
+
+export async function listTimeline() {
+  const claims = await Claim.find().sort({ observedAt: -1 }).limit(80).lean();
+  const evidence = await evidenceForClaims(claims);
+  const byId = new Map(evidence.map((item) => [String(item._id), item]));
+  const grouped = new Map();
+  for (const claim of claims) {
+    if (!grouped.has(claim.entity)) grouped.set(claim.entity, []);
+    grouped.get(claim.entity).push(claim);
+  }
+  return [...grouped.entries()].slice(0, 8).map(([entity, rows]) => {
+    const ordered = [...rows].sort((a, b) => new Date(a.observedAt) - new Date(b.observedAt));
+    let previous = '';
+    const events = ordered.slice(-4).map((claim) => {
+      const snapshot = byId.get(String(claim.evidenceId));
+      const hash = snapshot?.contentHash || '';
+      const sameHash = Boolean(previous) && Boolean(hash) && previous === hash;
+      if (hash) previous = hash;
+      return {
+        at: claim.observedAt,
+        display: claim.display || '',
+        quote: claim.quote || '',
+        url: claim.url || snapshot?.url || '',
+        aspect: claim.aspect,
+        sameHash,
+      };
+    });
+    return { entity, events };
+  });
+}
+
 export async function saveClaims(docs) {
   if (!docs.length) return [];
   const saved = await Claim.insertMany(docs);
@@ -135,6 +170,8 @@ export function presentMessage(row) {
     citations: row.citations || [],
     confidence: row.confidence || '',
     abstainReason: row.abstainReason || '',
+    comparison: row.comparison || [],
+    missingNote: row.missingNote || '',
     trace: row.trace || [],
     topic: row.topic || '',
     entities: row.entities || [],

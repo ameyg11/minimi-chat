@@ -23,28 +23,79 @@ export async function searchWeb({ query, includeDomains, maxResults = 5 }) {
 }
 
 export async function extractPages(urls) {
-  const list = [...new Set(urls.filter(Boolean))].slice(0, 20);
-  if (!list.length) return { pages: [], failed: [] };
-  const data = await tavily('extract', {
-    urls: list,
-    extract_depth: 'advanced',
-  }, 40000);
+  const list = [...new Set(urls.filter(Boolean))].slice(0, 8);
+  if (!list.length) return { pages: [], failed: [], retried: false };
+  const first = await extractOnce(list);
+  const thin = list.filter((url) => textOf(first, url).length < 400);
+  let second = [];
+  if (thin.length) {
+    try {
+      second = (await extractOnce(thin)).pages;
+    } catch (err) {
+      if (err.code === 'auth' || err.code === 'quota') throw err;
+    }
+  }
+  const stillThin = thin.filter((url) => Math.max(textOf(first, url).length, textOf({ pages: second }, url).length) < 400);
+  const direct = stillThin.length ? await directFetch(stillThin) : [];
+  const pages = [];
+  const failed = [];
+  for (const url of list) {
+    const candidates = [first.pages, second, direct]
+      .flatMap((set) => set.filter((page) => page.url === url));
+    const page = candidates.sort((a, b) => b.text.length - a.text.length)[0];
+    if (page && page.text.length >= 80) pages.push(page);
+    else failed.push({ url, error: 'empty page' });
+  }
+  return { pages, failed, retried: thin.length > 0 };
+}
+
+async function extractOnce(urls) {
+  const data = await tavily('extract', { urls, extract_depth: 'advanced' }, 40000);
   const pages = (data.results || []).map((result) => ({
     url: result.url,
     title: result.title || '',
     text: String(result.raw_content || result.content || '').slice(0, PAGE_CAP),
   })).filter((page) => page.url && page.text);
-  const failed = (data.failed_results || []).map((result) => ({
-    url: result.url,
-    error: result.error || 'failed',
-  }));
-  const found = new Set(pages.map((page) => page.url));
-  for (const url of list) {
-    if (!found.has(url) && !failed.some((item) => item.url === url)) {
-      failed.push({ url, error: 'empty page' });
+  return { pages };
+}
+
+async function directFetch(urls) {
+  const pages = [];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          Accept: 'text/html,text/plain',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) continue;
+      const type = res.headers.get('content-type') || '';
+      if (type && !/html|text\/plain/.test(type)) continue;
+      const text = htmlToText(await res.text()).slice(0, PAGE_CAP);
+      if (text.length >= 80) pages.push({ url, title: '', text });
+    } catch {
+      continue;
     }
   }
-  return { pages, failed };
+  return pages;
+}
+
+function textOf(result, url) {
+  return result.pages.find((page) => page.url === url)?.text || '';
+}
+
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 async function tavily(path, body, timeout) {
