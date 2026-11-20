@@ -1,4 +1,4 @@
-# minimi chat
+# trace chat
 
 A chat agent with one tool, web search. It remembers what you asked and the page it read, then checks later whether that answer is still true.
 

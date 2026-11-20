@@ -1,5 +1,5 @@
 {
-  "name": "minimi-server",
+  "name": "trace-server",
   "private": true,
   "type": "module",
   "scripts": {

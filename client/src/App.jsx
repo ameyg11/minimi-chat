@@ -116,7 +116,7 @@ export function App() {
       <main className="main">
         <header className="topbar">
           <button type="button" className="menu" onClick={() => setSidebarOpen(true)}>Chats</button>
-          <p className="topbar-title">minimi</p>
+          <p className="topbar-title">trace</p>
         </header>
         <Chat messages={messages} streaming={streaming} status={status} busy={busy} />
         {error ? <p className="error" role="alert">{error}</p> : null}

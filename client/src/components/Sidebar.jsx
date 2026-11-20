@@ -4,7 +4,7 @@ export function Sidebar({ conversations, facts, timeline = [], activeId, open, o
       <div className="brand">
         <span className="mark" aria-hidden="true" />
         <div>
-          <p className="brand-name">minimi</p>
+          <p className="brand-name">trace</p>
           <p className="brand-note">Remembers what it checked</p>
         </div>
         <button type="button" className="close" onClick={onClose} aria-label="Close chats">Close</button>

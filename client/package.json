@@ -1,5 +1,5 @@
 {
-  "name": "minimi-client",
+  "name": "trace-client",
   "private": true,
   "type": "module",
   "scripts": {
